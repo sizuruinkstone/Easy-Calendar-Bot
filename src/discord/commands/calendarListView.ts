@@ -8,7 +8,8 @@ import type { CalendarListedEvent, CalendarListResult } from "../../calendar/typ
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const CALENDAR_LIST_EMBED_COLOR = 0x2f80ed;
+export const CALENDAR_LIST_EMBED_COLOR = 0x2f80ed;
+const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
 export type CalendarListViewOptions = {
   title: string;
@@ -60,4 +61,29 @@ export function formatCalendarEventLine(
   const end = event.end ? dayjs(event.end).tz(timezoneName).format("HH:mm") : null;
 
   return end ? `${start}-${end} ${event.title}` : `${start} ${event.title}`;
+}
+
+export function getCalendarEventDateKey(
+  event: CalendarListedEvent,
+  timezoneName: string,
+): string {
+  return getCalendarEventStart(event, timezoneName).format("YYYY-MM-DD");
+}
+
+export function formatCalendarDateHeading(
+  dateKey: string,
+  timezoneName: string,
+): string {
+  const date = dayjs.tz(dateKey, timezoneName);
+
+  return `${date.format("M/D")}(${WEEKDAY_LABELS[date.day()]})`;
+}
+
+function getCalendarEventStart(
+  event: CalendarListedEvent,
+  timezoneName: string,
+): dayjs.Dayjs {
+  return event.allDay
+    ? dayjs.tz(event.start, timezoneName)
+    : dayjs(event.start).tz(timezoneName);
 }

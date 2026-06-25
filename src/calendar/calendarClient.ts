@@ -138,27 +138,50 @@ export async function listTomorrowCalendarEvents(
   });
 }
 
+export async function listWeekCalendarEvents(
+  options?: CalendarClientOptions,
+  now: Date = new Date(),
+): Promise<CalendarListResult> {
+  return listCalendarEventsForRange({
+    options,
+    now,
+    dayOffset: 0,
+    durationDays: 7,
+    emptyMessage: "今後7日間の予定はありません。",
+    successMessage: (count) => `今後7日間の予定を${count}件取得しました。`,
+    errorLabel: "今後7日間の予定取得",
+  });
+}
+
 export function buildTodayCalendarListRange(
   now: Date,
   timezoneName: string = DEFAULT_TIMEZONE,
 ): CalendarListRange {
-  return buildCalendarListRange(now, 0, timezoneName);
+  return buildCalendarListRange(now, 0, 1, timezoneName);
 }
 
 export function buildTomorrowCalendarListRange(
   now: Date,
   timezoneName: string = DEFAULT_TIMEZONE,
 ): CalendarListRange {
-  return buildCalendarListRange(now, 1, timezoneName);
+  return buildCalendarListRange(now, 1, 1, timezoneName);
+}
+
+export function buildWeekCalendarListRange(
+  now: Date,
+  timezoneName: string = DEFAULT_TIMEZONE,
+): CalendarListRange {
+  return buildCalendarListRange(now, 0, 7, timezoneName);
 }
 
 function buildCalendarListRange(
   now: Date,
   dayOffset: number,
+  durationDays: number,
   timezoneName: string,
 ): CalendarListRange {
   const start = dayjs(now).tz(timezoneName).startOf("day").add(dayOffset, "day");
-  const end = start.add(1, "day");
+  const end = start.add(durationDays, "day");
 
   return {
     timeMin: start.format(),
@@ -182,8 +205,41 @@ async function listCalendarEventsForDay({
   successMessage: (count: number) => string;
   errorLabel: string;
 }): Promise<CalendarListResult> {
+  return listCalendarEventsForRange({
+    options,
+    now,
+    dayOffset,
+    durationDays: 1,
+    emptyMessage,
+    successMessage,
+    errorLabel,
+  });
+}
+
+async function listCalendarEventsForRange({
+  options,
+  now,
+  dayOffset,
+  durationDays,
+  emptyMessage,
+  successMessage,
+  errorLabel,
+}: {
+  options?: CalendarClientOptions;
+  now: Date;
+  dayOffset: number;
+  durationDays: number;
+  emptyMessage: string;
+  successMessage: (count: number) => string;
+  errorLabel: string;
+}): Promise<CalendarListResult> {
   const resolvedOptions = resolveCalendarClientOptions(options);
-  const range = buildCalendarListRange(now, dayOffset, resolvedOptions.timezone);
+  const range = buildCalendarListRange(
+    now,
+    dayOffset,
+    durationDays,
+    resolvedOptions.timezone,
+  );
   const missingFields = getMissingGoogleConfigFields(resolvedOptions);
 
   if (missingFields.length > 0) {

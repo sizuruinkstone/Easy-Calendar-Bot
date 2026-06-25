@@ -15,8 +15,6 @@ export const HELP_MESSAGE = [
   "- /add text:",
   "- /today",
   "- /tomorrow",
-  "- /help",
-  "",
-  "今後の予定:",
   "- /week",
+  "- /help",
 ].join("\n");

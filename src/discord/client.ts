@@ -10,6 +10,7 @@ import {
 import { HELP_COMMAND_NAME, HELP_MESSAGE } from "./commands/help";
 import { handleTodayCommand, TODAY_COMMAND_NAME } from "./commands/today";
 import { handleTomorrowCommand, TOMORROW_COMMAND_NAME } from "./commands/tomorrow";
+import { handleWeekCommand, WEEK_COMMAND_NAME } from "./commands/week";
 
 export function createDiscordClient(): Client {
   const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -40,6 +41,11 @@ export function createDiscordClient(): Client {
 
     if (interaction.commandName === TOMORROW_COMMAND_NAME) {
       await handleTomorrowCommand(interaction);
+      return;
+    }
+
+    if (interaction.commandName === WEEK_COMMAND_NAME) {
+      await handleWeekCommand(interaction);
       return;
     }
 

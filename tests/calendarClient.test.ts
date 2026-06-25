@@ -4,9 +4,11 @@ import {
   buildGoogleCalendarEventResource,
   buildTodayCalendarListRange,
   buildTomorrowCalendarListRange,
+  buildWeekCalendarListRange,
   createCalendarEvent,
   listTodayCalendarEvents,
   listTomorrowCalendarEvents,
+  listWeekCalendarEvents,
 } from "../src/calendar/calendarClient";
 import { buildCalendarConfirmationContent } from "../src/discord/commands/add";
 import { parseNaturalText } from "../src/parser/parseNaturalText";
@@ -177,6 +179,16 @@ describe("calendarClient", () => {
     });
   });
 
+  it("builds the Asia/Tokyo range for the next 7 days", () => {
+    const result = buildWeekCalendarListRange(now, "Asia/Tokyo");
+
+    expect(result).toEqual({
+      timeMin: "2026-06-25T00:00:00+09:00",
+      timeMax: "2026-07-02T00:00:00+09:00",
+      timezone: "Asia/Tokyo",
+    });
+  });
+
   it("returns not-configured when listing today's events without Google settings", async () => {
     const result = await listTodayCalendarEvents({ dryRun: false }, now);
 
@@ -195,6 +207,22 @@ describe("calendarClient", () => {
 
   it("returns not-configured when listing tomorrow's events without Google settings", async () => {
     const result = await listTomorrowCalendarEvents({ dryRun: false }, now);
+
+    expect(result.success).toBe(false);
+    expect(result.mode).toBe("not-configured");
+
+    if (!result.success && result.mode === "not-configured") {
+      expect(result.errorCode).toBe("GOOGLE_CALENDAR_NOT_CONFIGURED");
+      expect(result.missingFields).toEqual([
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_REFRESH_TOKEN",
+      ]);
+    }
+  });
+
+  it("returns not-configured when listing the next 7 days without Google settings", async () => {
+    const result = await listWeekCalendarEvents({ dryRun: false }, now);
 
     expect(result.success).toBe(false);
     expect(result.mode).toBe("not-configured");
@@ -315,6 +343,59 @@ describe("calendarClient", () => {
     }
   });
 
+  it("lists the next 7 days with a mocked Google Calendar list call", async () => {
+    const result = await listWeekCalendarEvents(
+      {
+        googleClientId: "client-id",
+        googleClientSecret: "client-secret",
+        googleRefreshToken: "refresh-token",
+        listEvents: async (_config, range) => {
+          expect(range.timeMin).toBe("2026-06-25T00:00:00+09:00");
+          expect(range.timeMax).toBe("2026-07-02T00:00:00+09:00");
+
+          return [
+            {
+              id: "work-1",
+              summary: "バイト",
+              htmlLink: null,
+              start: { dateTime: "2026-06-26T17:00:00+09:00", timeZone: "Asia/Tokyo" },
+              end: { dateTime: "2026-06-26T23:00:00+09:00", timeZone: "Asia/Tokyo" },
+            },
+            {
+              id: "report-1",
+              summary: "レポート",
+              htmlLink: null,
+              start: { date: "2026-06-27" },
+              end: { date: "2026-06-28" },
+            },
+          ];
+        },
+      },
+      now,
+    );
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.events).toMatchObject([
+        {
+          id: "work-1",
+          title: "バイト",
+          allDay: false,
+          start: "2026-06-26T17:00:00+09:00",
+          end: "2026-06-26T23:00:00+09:00",
+        },
+        {
+          id: "report-1",
+          title: "レポート",
+          allDay: true,
+          start: "2026-06-27",
+          end: "2026-06-28",
+        },
+      ]);
+    }
+  });
+
   it("returns an error result when listing today's events fails", async () => {
     const result = await listTodayCalendarEvents(
       {
@@ -357,6 +438,29 @@ describe("calendarClient", () => {
     if (!result.success && result.mode === "error") {
       expect(result.errorCode).toBe("GOOGLE_CALENDAR_LIST_FAILED");
       expect(result.message).toContain("明日の予定取得に失敗しました");
+      expect(result.errorMessage).toBe("list failed");
+    }
+  });
+
+  it("returns an error result when listing the next 7 days fails", async () => {
+    const result = await listWeekCalendarEvents(
+      {
+        googleClientId: "client-id",
+        googleClientSecret: "client-secret",
+        googleRefreshToken: "refresh-token",
+        listEvents: async () => {
+          throw new Error("list failed");
+        },
+      },
+      now,
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.mode).toBe("error");
+
+    if (!result.success && result.mode === "error") {
+      expect(result.errorCode).toBe("GOOGLE_CALENDAR_LIST_FAILED");
+      expect(result.message).toContain("今後7日間の予定取得に失敗しました");
       expect(result.errorMessage).toBe("list failed");
     }
   });
