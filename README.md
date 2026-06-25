@@ -1,66 +1,133 @@
-# Easy Calendar Bot
+# ズボラカレンダー
 
-ズボラカレンダー / 楽ちんカレンダー系プロジェクトの実装リポジトリです。
+予定、課題、バイト、リマインドの登録が面倒な問題を減らすための個人用カレンダー支援プロジェクトです。
 
-Discordから自然文で予定・課題・リマインドを入力し、Google Calendarなどへ楽に登録・確認・通知できるBotを作ります。
+自然文やリンクを投げるだけで、予定候補の作成、確認、登録、通知まで進められる仕組みを目指します。初期段階では外部 API 連携を広げず、自然文を予定候補に変換する小さい MVP から始めます。
 
-## コンセプト
+## 解決したい問題
 
-このBotは「Google Calendarを毎日開くためのBot」ではありません。
+- カレンダーやタスク管理ツールへの手入力が面倒で続かない
+- 課題、バイト、リマインド、予定が複数の場所に散らばる
+- Discord やメールで見た予定を後で登録し忘れる
+- まず予定候補を作って確認できる軽い入口がほしい
 
-Google Calendarは、予定保存・同期のための裏方として使います。日常的に触るUIは、以下を想定します。
+## MVP Phase 1
 
-- Discord Bot
-- iPhone純正カレンダー
-- iPhone通知
-- Discord通知
+今回の MVP は、自然文を `ParsedSchedule` に変換するルールベースのパーサです。
 
-Google CalendarのWeb/App UIは、管理・デバッグ用途に寄せます。普段の予定確認は、iPhone純正カレンダーかDiscordコマンドで完結させます。
+対応例:
 
-## 最初のMVP
+- `明日17時からバイト`
+- `今日21時に課題`
+- `6/28 13:00 物理レポート締切`
+- `来週月曜 朝にゴミ出し`
 
-まずは以下だけを目標にします。
+出力例:
 
-1. Discordで `/add text:` を実行
-2. 自然文から予定候補を作る
-3. 登録前にDiscord上で確認する
-4. 確認後にGoogle Calendarへ登録する
-5. iPhone純正カレンダーにGoogle Calendarを同期して表示する
-6. `/today` `/tomorrow` `/week` で予定を確認する
-
-## カレンダー方針
-
-Phase 1では、Botの登録先はGoogle Calendarにします。
-
-ただし、Google Calendarはあくまで同期基盤です。ユーザーがGoogle Calendar UIを日常的に開く前提にはしません。
-
-```txt
-Discord
-↓
-Easy Calendar Bot
-↓
-Google Calendar API
-↓
-iPhone純正カレンダーで表示
+```json
+{
+  "title": "バイト",
+  "type": "work",
+  "start": "2026-06-26T17:00:00+09:00",
+  "end": null,
+  "source": "manual",
+  "rawText": "明日17時からバイト",
+  "confidence": 0.8
+}
 ```
 
-iPhoneでは、Googleアカウントのカレンダー同期をONにして、純正カレンダーアプリ上で予定を見る運用を想定します。
+## 将来的に作りたい機能
 
-将来的に、Google Calendar自体を避けたい場合は iCloud Calendar / CalDAV 直接登録も検討します。ただし、Apple IDのアプリ用パスワードやCalDAV実装が絡むため、Phase 1では対象外です。
+- Discord から自然文を投げて予定候補を作成する
+- 候補を確認して Google Calendar などへ登録する
+- Gmail から課題、面談、支払い、締切などを抽出する
+- Notion と連携して課題や予定の状態を整理する
+- 今日、明日、今週の予定やリマインドを Discord に通知する
 
-## Handoff docs
+Google Calendar / Gmail / Notion の本連携、OAuth、DB 設計の拡張は今回の範囲外です。
 
-Claude / Codex に作業を渡すときは、以下を使います。
+## セットアップ
 
-- [Claude Handoff](docs/CLAUDE_HANDOFF.md)
-- [Codex Handoff](docs/CODEX_HANDOFF.md)
+```bash
+npm install
+```
 
-## 方針
+`.env.example` を参考に環境変数を用意します。`.env` はコミットしません。
 
-- 新規リポジトリは作らず、この `Easy-Calendar-Bot` 内で実装します。
-- 最初からGmail/Notionまで広げず、Discord → Google Calendarの予定登録に集中します。
-- Google Calendarは裏方の保存・同期先として扱い、日常UIにはしません。
-- 予定の表示・確認はDiscordとiPhone純正カレンダーを主導線にします。
-- ユーザーは厳密入力が面倒なので、自然文入力を前提にします。
-- ただし登録ミスを避けるため、Google Calendar登録前には必ず確認ステップを挟みます。
-- タイムゾーンは `Asia/Tokyo` 固定です。
+```env
+DISCORD_BOT_TOKEN=
+DISCORD_CLIENT_ID=
+DISCORD_GUILD_ID=
+TIMEZONE=Asia/Tokyo
+```
+
+## 起動方法
+
+手元でパーサを動かす場合:
+
+```bash
+npm run dev -- "明日17時からバイト"
+```
+
+ビルド後に実行する場合:
+
+```bash
+npm run build
+npm start -- "今日21時に課題"
+```
+
+Discord Bot は現時点では `/parse` コマンドの雛形のみです。認証、コマンド登録、本格運用は未実装です。
+
+## テスト方法
+
+```bash
+npm test
+npm run typecheck
+```
+
+lint はまだ導入していません。必要になった段階で ESLint などを追加します。
+
+## 環境変数
+
+- `DISCORD_BOT_TOKEN`: Discord Bot トークン。本格起動時に使用します。
+- `DISCORD_CLIENT_ID`: Discord アプリケーションの Client ID。
+- `DISCORD_GUILD_ID`: 開発用 Discord サーバー ID。
+- `TIMEZONE`: 想定タイムゾーン。初期値は `Asia/Tokyo` です。
+
+## AI 実装ループ運用
+
+このプロジェクトでは Codex と Claude を併用して開発します。
+
+役割分担:
+
+- Codex: 実装、テスト追加、リファクタ、差分作成
+- Claude: 設計レビュー、仕様整理、実装方針レビュー、次タスク作成
+- Human: 最終判断、方向修正、仕様決定
+
+作業ループ:
+
+1. Human が小さいタスクを渡す
+2. Codex が実装する
+3. Codex が test / typecheck / lint を実行する
+4. Codex が vault を更新する
+5. Claude が必要に応じてレビューする
+6. Human が OK / NG を判断する
+7. 次タスクへ進む
+
+## 今後の TODO
+
+- `/parse` コマンド登録用スクリプトを追加する
+- パーサの対応表現を増やす
+- 日付のみ、時刻のみ、曖昧表現の扱いを決める
+- confidence の算出ルールを見直す
+- Discord 返信フォーマットを整理する
+- Google Calendar 連携の前に確認フローを設計する
+
+## 関連ドキュメント
+
+- `vault/project-state.md`: 現在の状態と次の作業
+- `vault/decisions.md`: 技術選定と設計判断
+- `vault/open-loops.md`: 未解決事項
+- `vault/context.md`: プロジェクト文脈
+- `vault/codex-rules.md`: Codex 作業ルール
+- `vault/handoff-template.md`: 次タスク依頼テンプレート
