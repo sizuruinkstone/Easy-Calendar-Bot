@@ -6,10 +6,11 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit",
+    "register-commands": "tsx src/discord/registerCommands.ts"
   },
   "keywords": [
     "calendar",
@@ -21,7 +22,8 @@
   "dependencies": {
     "dayjs": "^1.11.13",
     "discord.js": "^14.16.3",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "zod": "^4.4.3"
   },
   "overrides": {
     "undici": "6.27.0"

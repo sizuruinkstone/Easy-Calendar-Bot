@@ -1,13 +1,5 @@
-import { SlashCommandBuilder } from "discord.js";
+import { addCommand } from "./commands/add";
+import { helpCommand } from "./commands/help";
 
-export const parseCommand = new SlashCommandBuilder()
-  .setName("parse")
-  .setDescription("自然文を予定候補に変換します")
-  .addStringOption((option) =>
-    option
-      .setName("text")
-      .setDescription("例: 明日17時からバイト")
-      .setRequired(true),
-  );
-
-export const commands = [parseCommand.toJSON()];
+export const commandBuilders = [helpCommand, addCommand] as const;
+export const commands = commandBuilders.map((command) => command.toJSON());
