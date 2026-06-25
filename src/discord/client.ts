@@ -8,6 +8,7 @@ import {
   isAddButtonCustomId,
 } from "./commands/add";
 import { HELP_COMMAND_NAME, HELP_MESSAGE } from "./commands/help";
+import { handleTodayCommand, TODAY_COMMAND_NAME } from "./commands/today";
 
 export function createDiscordClient(): Client {
   const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -28,6 +29,11 @@ export function createDiscordClient(): Client {
 
     if (interaction.commandName === ADD_COMMAND_NAME) {
       await handleAddCommand(interaction);
+      return;
+    }
+
+    if (interaction.commandName === TODAY_COMMAND_NAME) {
+      await handleTodayCommand(interaction);
       return;
     }
 

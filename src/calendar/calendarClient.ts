@@ -3,15 +3,22 @@ import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
 
 import { config } from "../config";
-import { insertGoogleCalendarEvent } from "./googleCalendarClient";
+import {
+  insertGoogleCalendarEvent,
+  listGoogleCalendarEvents,
+} from "./googleCalendarClient";
 import type {
   CalendarEventInserter,
   CalendarClientOptions,
   CalendarEventCandidateInput,
   CalendarEventDraft,
+  CalendarListedEvent,
+  CalendarListRange,
+  CalendarListResult,
   CalendarRegistrationResult,
   GoogleCalendarEventResource,
   GoogleCalendarInsertConfig,
+  GoogleCalendarListedEventResource,
 } from "./types";
 
 dayjs.extend(utc);
@@ -103,6 +110,77 @@ export function toCalendarEventDraft(
   };
 }
 
+export async function listTodayCalendarEvents(
+  options?: CalendarClientOptions,
+  now: Date = new Date(),
+): Promise<CalendarListResult> {
+  const resolvedOptions = resolveCalendarClientOptions(options);
+  const range = buildTodayCalendarListRange(now, resolvedOptions.timezone);
+  const missingFields = getMissingGoogleConfigFields(resolvedOptions);
+
+  if (missingFields.length > 0) {
+    return {
+      success: false,
+      mode: "not-configured",
+      message:
+        "Google Calendar連携が未設定です。GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN を設定してください。",
+      errorCode: "GOOGLE_CALENDAR_NOT_CONFIGURED",
+      missingFields,
+      range,
+    };
+  }
+
+  const googleConfig: GoogleCalendarInsertConfig = {
+    clientId: resolvedOptions.googleClientId,
+    clientSecret: resolvedOptions.googleClientSecret,
+    refreshToken: resolvedOptions.googleRefreshToken,
+    calendarId: resolvedOptions.googleCalendarId,
+  };
+
+  try {
+    const events = await resolvedOptions.listEvents(googleConfig, range);
+    const normalizedEvents = events.map((event) =>
+      toCalendarListedEvent(event, resolvedOptions.timezone),
+    );
+
+    return {
+      success: true,
+      mode: "live",
+      message:
+        normalizedEvents.length === 0
+          ? "今日の予定はありません。"
+          : `今日の予定を${normalizedEvents.length}件取得しました。`,
+      events: normalizedEvents,
+      range,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    return {
+      success: false,
+      mode: "error",
+      message: `今日の予定取得に失敗しました。Botは停止していません。理由: ${errorMessage}`,
+      errorCode: "GOOGLE_CALENDAR_LIST_FAILED",
+      errorMessage,
+      range,
+    };
+  }
+}
+
+export function buildTodayCalendarListRange(
+  now: Date,
+  timezoneName: string = DEFAULT_TIMEZONE,
+): CalendarListRange {
+  const start = dayjs(now).tz(timezoneName).startOf("day");
+  const end = start.add(1, "day");
+
+  return {
+    timeMin: start.format(),
+    timeMax: end.format(),
+    timezone: timezoneName,
+  };
+}
+
 function resolveCalendarClientOptions(options?: CalendarClientOptions): Required<CalendarClientOptions> {
   if (options) {
     return {
@@ -113,6 +191,7 @@ function resolveCalendarClientOptions(options?: CalendarClientOptions): Required
       googleCalendarId: options.googleCalendarId || DEFAULT_CALENDAR_ID,
       timezone: options.timezone || DEFAULT_TIMEZONE,
       insertEvent: options.insertEvent ?? insertGoogleCalendarEvent,
+      listEvents: options.listEvents ?? listGoogleCalendarEvents,
     };
   }
 
@@ -124,6 +203,7 @@ function resolveCalendarClientOptions(options?: CalendarClientOptions): Required
     googleCalendarId: config.googleCalendarId || DEFAULT_CALENDAR_ID,
     timezone: config.timezone || DEFAULT_TIMEZONE,
     insertEvent: insertGoogleCalendarEvent,
+    listEvents: listGoogleCalendarEvents,
   };
 }
 
@@ -154,6 +234,28 @@ function formatDraftSummary(draft: CalendarEventDraft): string {
   const end = draft.end ? ` - ${draft.end}` : "";
 
   return `${draft.title} / ${start}${end}`;
+}
+
+function toCalendarListedEvent(
+  event: GoogleCalendarListedEventResource,
+  timezoneName: string,
+): CalendarListedEvent {
+  const allDay = Boolean(event.start.date);
+  const start = event.start.date ?? event.start.dateTime;
+
+  if (!start) {
+    throw new Error("Google Calendar event start is missing.");
+  }
+
+  return {
+    id: event.id,
+    title: event.summary || "無題",
+    htmlLink: event.htmlLink,
+    allDay,
+    start,
+    end: event.end.date ?? event.end.dateTime ?? null,
+    timezone: event.start.timeZone ?? timezoneName,
+  };
 }
 
 export function buildGoogleCalendarEventResource(
