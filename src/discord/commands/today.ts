@@ -1,8 +1,4 @@
-import dayjs from "dayjs";
-import timezone from "dayjs/plugin/timezone";
-import utc from "dayjs/plugin/utc";
 import {
-  EmbedBuilder,
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
   type InteractionReplyOptions,
@@ -10,9 +6,7 @@ import {
 
 import { listTodayCalendarEvents } from "../../calendar/calendarClient";
 import type { CalendarListedEvent, CalendarListResult } from "../../calendar/types";
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
+import { buildCalendarListReply, formatCalendarEventLine } from "./calendarListView";
 
 export const TODAY_COMMAND_NAME = "today";
 
@@ -29,45 +23,15 @@ export async function handleTodayCommand(
 }
 
 export function buildTodayReply(result: CalendarListResult): InteractionReplyOptions {
-  if (!result.success) {
-    return {
-      content: result.message,
-      ephemeral: true,
-    };
-  }
-
-  if (result.events.length === 0) {
-    return {
-      content: "今日の予定はありません。",
-      ephemeral: true,
-    };
-  }
-
-  return {
-    embeds: [
-      new EmbedBuilder()
-        .setTitle("今日の予定")
-        .setDescription(
-          result.events
-            .map((event) => `* ${formatTodayEventLine(event, result.range.timezone)}`)
-            .join("\n"),
-        )
-        .setColor(0x2f80ed),
-    ],
-    ephemeral: true,
-  };
+  return buildCalendarListReply(result, {
+    title: "今日の予定",
+    emptyMessage: "今日の予定はありません。",
+  });
 }
 
 export function formatTodayEventLine(
   event: CalendarListedEvent,
   timezoneName: string,
 ): string {
-  if (event.allDay) {
-    return `終日 ${event.title}`;
-  }
-
-  const start = dayjs(event.start).tz(timezoneName).format("HH:mm");
-  const end = event.end ? dayjs(event.end).tz(timezoneName).format("HH:mm") : null;
-
-  return end ? `${start}-${end} ${event.title}` : `${start} ${event.title}`;
+  return formatCalendarEventLine(event, timezoneName);
 }

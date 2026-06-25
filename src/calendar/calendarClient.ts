@@ -114,8 +114,76 @@ export async function listTodayCalendarEvents(
   options?: CalendarClientOptions,
   now: Date = new Date(),
 ): Promise<CalendarListResult> {
+  return listCalendarEventsForDay({
+    options,
+    now,
+    dayOffset: 0,
+    emptyMessage: "今日の予定はありません。",
+    successMessage: (count) => `今日の予定を${count}件取得しました。`,
+    errorLabel: "今日の予定取得",
+  });
+}
+
+export async function listTomorrowCalendarEvents(
+  options?: CalendarClientOptions,
+  now: Date = new Date(),
+): Promise<CalendarListResult> {
+  return listCalendarEventsForDay({
+    options,
+    now,
+    dayOffset: 1,
+    emptyMessage: "明日の予定はありません。",
+    successMessage: (count) => `明日の予定を${count}件取得しました。`,
+    errorLabel: "明日の予定取得",
+  });
+}
+
+export function buildTodayCalendarListRange(
+  now: Date,
+  timezoneName: string = DEFAULT_TIMEZONE,
+): CalendarListRange {
+  return buildCalendarListRange(now, 0, timezoneName);
+}
+
+export function buildTomorrowCalendarListRange(
+  now: Date,
+  timezoneName: string = DEFAULT_TIMEZONE,
+): CalendarListRange {
+  return buildCalendarListRange(now, 1, timezoneName);
+}
+
+function buildCalendarListRange(
+  now: Date,
+  dayOffset: number,
+  timezoneName: string,
+): CalendarListRange {
+  const start = dayjs(now).tz(timezoneName).startOf("day").add(dayOffset, "day");
+  const end = start.add(1, "day");
+
+  return {
+    timeMin: start.format(),
+    timeMax: end.format(),
+    timezone: timezoneName,
+  };
+}
+
+async function listCalendarEventsForDay({
+  options,
+  now,
+  dayOffset,
+  emptyMessage,
+  successMessage,
+  errorLabel,
+}: {
+  options?: CalendarClientOptions;
+  now: Date;
+  dayOffset: number;
+  emptyMessage: string;
+  successMessage: (count: number) => string;
+  errorLabel: string;
+}): Promise<CalendarListResult> {
   const resolvedOptions = resolveCalendarClientOptions(options);
-  const range = buildTodayCalendarListRange(now, resolvedOptions.timezone);
+  const range = buildCalendarListRange(now, dayOffset, resolvedOptions.timezone);
   const missingFields = getMissingGoogleConfigFields(resolvedOptions);
 
   if (missingFields.length > 0) {
@@ -148,8 +216,8 @@ export async function listTodayCalendarEvents(
       mode: "live",
       message:
         normalizedEvents.length === 0
-          ? "今日の予定はありません。"
-          : `今日の予定を${normalizedEvents.length}件取得しました。`,
+          ? emptyMessage
+          : successMessage(normalizedEvents.length),
       events: normalizedEvents,
       range,
     };
@@ -159,26 +227,12 @@ export async function listTodayCalendarEvents(
     return {
       success: false,
       mode: "error",
-      message: `今日の予定取得に失敗しました。Botは停止していません。理由: ${errorMessage}`,
+      message: `${errorLabel}に失敗しました。Botは停止していません。理由: ${errorMessage}`,
       errorCode: "GOOGLE_CALENDAR_LIST_FAILED",
       errorMessage,
       range,
     };
   }
-}
-
-export function buildTodayCalendarListRange(
-  now: Date,
-  timezoneName: string = DEFAULT_TIMEZONE,
-): CalendarListRange {
-  const start = dayjs(now).tz(timezoneName).startOf("day");
-  const end = start.add(1, "day");
-
-  return {
-    timeMin: start.format(),
-    timeMax: end.format(),
-    timezone: timezoneName,
-  };
 }
 
 function resolveCalendarClientOptions(options?: CalendarClientOptions): Required<CalendarClientOptions> {
