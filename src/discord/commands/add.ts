@@ -90,7 +90,7 @@ export async function handleAddButton(interaction: ButtonInteraction): Promise<v
   }
 
   if (button.action === "confirm") {
-    const calendarResult = createCalendarEvent(pendingEvent.candidate);
+    const calendarResult = await createCalendarEvent(pendingEvent.candidate);
     deletePendingEvent(pendingEvent.id);
 
     await interaction.update({
@@ -128,7 +128,7 @@ function buildCandidateEmbed(candidate: ParsedEventCandidate): EmbedBuilder {
       { name: "終了", value: formatDateTime(candidate.end, false), inline: true },
       {
         name: "登録先",
-        value: "Google Calendar予定。登録処理はStep 3で実装予定です。",
+        value: "Google Calendar予定。dry-runの場合は実登録しません。",
         inline: false,
       },
       { name: "元の入力", value: candidate.originalText || "未入力", inline: false },

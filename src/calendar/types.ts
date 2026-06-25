@@ -1,10 +1,11 @@
 import type { EventKind, EventStatus, ParsedEventCandidate } from "../parser/types";
 
-export type CalendarRegistrationMode = "dry-run" | "not-configured";
+export type CalendarRegistrationMode = "dry-run" | "not-configured" | "live" | "error";
 
 export type CalendarRegistrationErrorCode =
   | "GOOGLE_CALENDAR_NOT_CONFIGURED"
-  | "GOOGLE_CALENDAR_REGISTRATION_NOT_IMPLEMENTED";
+  | "GOOGLE_CALENDAR_INSERT_FAILED"
+  | "CALENDAR_EVENT_INVALID";
 
 export type CalendarEventDraft = {
   title: string;
@@ -27,12 +28,28 @@ export type CalendarRegistrationResult =
       draft: CalendarEventDraft;
     }
   | {
+      success: true;
+      mode: "live";
+      message: string;
+      draft: CalendarEventDraft;
+      eventId: string | null;
+      htmlLink: string | null;
+    }
+  | {
       success: false;
       mode: "not-configured";
       message: string;
       draft: CalendarEventDraft;
       errorCode: CalendarRegistrationErrorCode;
       missingFields: string[];
+    }
+  | {
+      success: false;
+      mode: "error";
+      message: string;
+      draft: CalendarEventDraft;
+      errorCode: CalendarRegistrationErrorCode;
+      errorMessage: string;
     };
 
 export type CalendarClientOptions = {
@@ -42,6 +59,39 @@ export type CalendarClientOptions = {
   googleRefreshToken?: string;
   googleCalendarId?: string;
   timezone?: string;
+  insertEvent?: CalendarEventInserter;
 };
 
 export type CalendarEventCandidateInput = ParsedEventCandidate;
+
+export type GoogleCalendarEventResource = {
+  summary: string;
+  description: string;
+  start: {
+    date?: string;
+    dateTime?: string;
+    timeZone?: string;
+  };
+  end: {
+    date?: string;
+    dateTime?: string;
+    timeZone?: string;
+  };
+};
+
+export type GoogleCalendarInsertConfig = {
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+  calendarId: string;
+};
+
+export type GoogleCalendarInsertResult = {
+  eventId: string | null;
+  htmlLink: string | null;
+};
+
+export type CalendarEventInserter = (
+  config: GoogleCalendarInsertConfig,
+  event: GoogleCalendarEventResource,
+) => Promise<GoogleCalendarInsertResult>;

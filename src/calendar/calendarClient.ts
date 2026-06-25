@@ -1,18 +1,29 @@
+import dayjs from "dayjs";
+import timezone from "dayjs/plugin/timezone";
+import utc from "dayjs/plugin/utc";
+
 import { config } from "../config";
+import { insertGoogleCalendarEvent } from "./googleCalendarClient";
 import type {
+  CalendarEventInserter,
   CalendarClientOptions,
   CalendarEventCandidateInput,
   CalendarEventDraft,
   CalendarRegistrationResult,
+  GoogleCalendarEventResource,
+  GoogleCalendarInsertConfig,
 } from "./types";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const DEFAULT_CALENDAR_ID = "primary";
 const DEFAULT_TIMEZONE = "Asia/Tokyo";
 
-export function createCalendarEvent(
+export async function createCalendarEvent(
   candidate: CalendarEventCandidateInput,
   options?: CalendarClientOptions,
-): CalendarRegistrationResult {
+): Promise<CalendarRegistrationResult> {
   const resolvedOptions = resolveCalendarClientOptions(options);
   const draft = toCalendarEventDraft(candidate, resolvedOptions);
 
@@ -31,22 +42,47 @@ export function createCalendarEvent(
       success: false,
       mode: "not-configured",
       message:
-        "Google Calendar連携が未設定です。Discordの仮動作では CALENDAR_DRY_RUN=true を設定してください。Google Calendar本登録はStep 3Bで実装予定です。",
+        "Google Calendar連携が未設定です。GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN を設定するか、CALENDAR_DRY_RUN=true にしてください。",
       draft,
       errorCode: "GOOGLE_CALENDAR_NOT_CONFIGURED",
       missingFields,
     };
   }
 
-  return {
-    success: false,
-    mode: "not-configured",
-    message:
-      "Google Calendar本登録はStep 3Bで実装予定です。現時点では CALENDAR_DRY_RUN=true で登録予定内容だけ確認できます。",
-    draft,
-    errorCode: "GOOGLE_CALENDAR_REGISTRATION_NOT_IMPLEMENTED",
-    missingFields: [],
+  const googleConfig: GoogleCalendarInsertConfig = {
+    clientId: resolvedOptions.googleClientId,
+    clientSecret: resolvedOptions.googleClientSecret,
+    refreshToken: resolvedOptions.googleRefreshToken,
+    calendarId: draft.calendarId,
   };
+
+  try {
+    const eventResource = buildGoogleCalendarEventResource(draft);
+    const insertResult = await resolvedOptions.insertEvent(googleConfig, eventResource);
+
+    return {
+      success: true,
+      mode: "live",
+      message: formatLiveSuccessMessage(insertResult.eventId, insertResult.htmlLink),
+      draft,
+      eventId: insertResult.eventId,
+      htmlLink: insertResult.htmlLink,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    return {
+      success: false,
+      mode: "error",
+      message: `Google Calendar登録に失敗しました。Botは停止していません。理由: ${errorMessage}`,
+      draft,
+      errorCode:
+        error instanceof InvalidCalendarEventError
+          ? "CALENDAR_EVENT_INVALID"
+          : "GOOGLE_CALENDAR_INSERT_FAILED",
+      errorMessage,
+    };
+  }
 }
 
 export function toCalendarEventDraft(
@@ -76,6 +112,7 @@ function resolveCalendarClientOptions(options?: CalendarClientOptions): Required
       googleRefreshToken: options.googleRefreshToken ?? "",
       googleCalendarId: options.googleCalendarId || DEFAULT_CALENDAR_ID,
       timezone: options.timezone || DEFAULT_TIMEZONE,
+      insertEvent: options.insertEvent ?? insertGoogleCalendarEvent,
     };
   }
 
@@ -86,6 +123,7 @@ function resolveCalendarClientOptions(options?: CalendarClientOptions): Required
     googleRefreshToken: config.googleRefreshToken ?? "",
     googleCalendarId: config.googleCalendarId || DEFAULT_CALENDAR_ID,
     timezone: config.timezone || DEFAULT_TIMEZONE,
+    insertEvent: insertGoogleCalendarEvent,
   };
 }
 
@@ -116,4 +154,70 @@ function formatDraftSummary(draft: CalendarEventDraft): string {
   const end = draft.end ? ` - ${draft.end}` : "";
 
   return `${draft.title} / ${start}${end}`;
+}
+
+export function buildGoogleCalendarEventResource(
+  draft: CalendarEventDraft,
+): GoogleCalendarEventResource {
+  if (!draft.start) {
+    throw new InvalidCalendarEventError("開始日時が未判定のためGoogle Calendarへ登録できません。");
+  }
+
+  const description = [
+    draft.description,
+    "",
+    `kind: ${draft.kind}`,
+    `status: ${draft.status}`,
+    `originalText: ${draft.originalText}`,
+  ]
+    .filter((line) => line !== null && line !== undefined)
+    .join("\n");
+
+  if (draft.allDay) {
+    const startDate = dayjs(draft.start).tz(draft.timezone).format("YYYY-MM-DD");
+    const endDate = draft.end
+      ? dayjs(draft.end).tz(draft.timezone).add(1, "day").format("YYYY-MM-DD")
+      : dayjs(draft.start).tz(draft.timezone).add(1, "day").format("YYYY-MM-DD");
+
+    return {
+      summary: draft.title,
+      description,
+      start: { date: startDate },
+      end: { date: endDate },
+    };
+  }
+
+  const start = dayjs(draft.start).tz(draft.timezone);
+  const end = draft.end ? dayjs(draft.end).tz(draft.timezone) : start.add(1, "hour");
+
+  return {
+    summary: draft.title,
+    description,
+    start: {
+      dateTime: start.format(),
+      timeZone: draft.timezone,
+    },
+    end: {
+      dateTime: end.format(),
+      timeZone: draft.timezone,
+    },
+  };
+}
+
+function formatLiveSuccessMessage(eventId: string | null, htmlLink: string | null): string {
+  const details = [
+    eventId ? `event id: ${eventId}` : null,
+    htmlLink ? `link: ${htmlLink}` : null,
+  ].filter(Boolean);
+
+  return details.length > 0
+    ? `Google Calendarに登録しました。${details.join(" / ")}`
+    : "Google Calendarに登録しました。";
+}
+
+class InvalidCalendarEventError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidCalendarEventError";
+  }
 }
