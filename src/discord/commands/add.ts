@@ -90,10 +90,12 @@ export async function handleAddButton(interaction: ButtonInteraction): Promise<v
   }
 
   if (button.action === "confirm") {
-    const calendarResult = await createCalendarEvent(pendingEvent.candidate);
+    await interaction.deferUpdate();
     deletePendingEvent(pendingEvent.id);
 
-    await interaction.update({
+    const calendarResult = await createCalendarEvent(pendingEvent.candidate);
+
+    await interaction.editReply({
       content: buildCalendarConfirmationContent(calendarResult),
       embeds: [],
       components: [],
