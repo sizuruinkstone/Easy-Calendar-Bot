@@ -10,6 +10,13 @@ const envSchema = z.object({
   DISCORD_TOKEN: optionalEnvValue,
   DISCORD_CLIENT_ID: optionalEnvValue,
   DISCORD_GUILD_ID: optionalEnvValue,
+  CALENDAR_DRY_RUN: z
+    .union([
+      z.literal("true").transform(() => true),
+      z.literal("false").transform(() => false),
+      z.literal("").transform(() => undefined),
+    ])
+    .optional(),
   GOOGLE_CLIENT_ID: optionalEnvValue,
   GOOGLE_CLIENT_SECRET: optionalEnvValue,
   GOOGLE_REFRESH_TOKEN: optionalEnvValue,
@@ -29,6 +36,7 @@ export const config = {
   discordToken: env.DISCORD_TOKEN,
   discordClientId: env.DISCORD_CLIENT_ID,
   discordGuildId: env.DISCORD_GUILD_ID,
+  calendarDryRun: env.CALENDAR_DRY_RUN ?? false,
   googleClientId: env.GOOGLE_CLIENT_ID,
   googleClientSecret: env.GOOGLE_CLIENT_SECRET,
   googleRefreshToken: env.GOOGLE_REFRESH_TOKEN,

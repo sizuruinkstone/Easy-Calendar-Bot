@@ -11,6 +11,8 @@ import {
   type ChatInputCommandInteraction,
 } from "discord.js";
 
+import { createCalendarEvent } from "../../calendar/calendarClient";
+import type { CalendarRegistrationResult } from "../../calendar/types";
 import { parseNaturalText } from "../../parser/parseNaturalText";
 import type { ParsedEventCandidate } from "../../parser/types";
 import {
@@ -88,10 +90,11 @@ export async function handleAddButton(interaction: ButtonInteraction): Promise<v
   }
 
   if (button.action === "confirm") {
+    const calendarResult = createCalendarEvent(pendingEvent.candidate);
     deletePendingEvent(pendingEvent.id);
 
     await interaction.update({
-      content: "Google Calendar連携は未実装です。登録処理はStep 3で実装予定です。",
+      content: buildCalendarConfirmationContent(calendarResult),
       embeds: [],
       components: [],
     });
@@ -105,6 +108,12 @@ export async function handleAddButton(interaction: ButtonInteraction): Promise<v
     embeds: [],
     components: [],
   });
+}
+
+export function buildCalendarConfirmationContent(
+  result: CalendarRegistrationResult,
+): string {
+  return result.message;
 }
 
 function buildCandidateEmbed(candidate: ParsedEventCandidate): EmbedBuilder {
