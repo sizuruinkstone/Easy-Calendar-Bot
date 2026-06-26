@@ -52,6 +52,10 @@ export function deletePendingEvent(id: string): boolean {
   return pendingEvents.delete(id);
 }
 
+export function clearPendingEventsForTest(): void {
+  pendingEvents.clear();
+}
+
 function pruneExpiredPendingEvents(): void {
   for (const [id, pendingEvent] of pendingEvents) {
     if (isExpired(pendingEvent)) {
