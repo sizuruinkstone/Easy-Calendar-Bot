@@ -10,6 +10,7 @@ const envSchema = z.object({
   DISCORD_TOKEN: optionalEnvValue,
   DISCORD_CLIENT_ID: optionalEnvValue,
   DISCORD_GUILD_ID: optionalEnvValue,
+  NOTIFY_CHANNEL_ID: optionalEnvValue,
   CALENDAR_DRY_RUN: z
     .union([
       z.literal("true").transform(() => true),
@@ -36,6 +37,7 @@ export const config = {
   discordToken: env.DISCORD_TOKEN,
   discordClientId: env.DISCORD_CLIENT_ID,
   discordGuildId: env.DISCORD_GUILD_ID,
+  notifyChannelId: env.NOTIFY_CHANNEL_ID,
   calendarDryRun: env.CALENDAR_DRY_RUN ?? false,
   googleClientId: env.GOOGLE_CLIENT_ID,
   googleClientSecret: env.GOOGLE_CLIENT_SECRET,
@@ -66,4 +68,8 @@ export function requireDiscordCommandConfig(): {
     clientId: requireConfigValue("DISCORD_CLIENT_ID", config.discordClientId),
     guildId: requireConfigValue("DISCORD_GUILD_ID", config.discordGuildId),
   };
+}
+
+export function requireNotifyChannelId(): string {
+  return requireConfigValue("NOTIFY_CHANNEL_ID", config.notifyChannelId);
 }
