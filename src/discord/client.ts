@@ -8,6 +8,10 @@ import {
   isAddButtonCustomId,
 } from "./commands/add";
 import { HELP_COMMAND_NAME, HELP_MESSAGE } from "./commands/help";
+import {
+  handleNotifyTestCommand,
+  NOTIFY_TEST_COMMAND_NAME,
+} from "./commands/notifyTest";
 import { handleTodayCommand, TODAY_COMMAND_NAME } from "./commands/today";
 import { handleTomorrowCommand, TOMORROW_COMMAND_NAME } from "./commands/tomorrow";
 import { handleWeekCommand, WEEK_COMMAND_NAME } from "./commands/week";
@@ -36,6 +40,11 @@ export function createDiscordClient(): Client {
 
     if (interaction.commandName === TODAY_COMMAND_NAME) {
       await handleTodayCommand(interaction);
+      return;
+    }
+
+    if (interaction.commandName === NOTIFY_TEST_COMMAND_NAME) {
+      await handleNotifyTestCommand(interaction);
       return;
     }
 
